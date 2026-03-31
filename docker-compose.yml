@@ -1,16 +1,16 @@
 services:
   postgres:
     image: postgres:16
-    container_name: sniff-n-frolic-pos
+    container_name: sniff-n-frolic-api
     restart: unless-stopped
     environment:
       POSTGRES_USER: snf
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: sniff_n_frolic_pos
+      POSTGRES_DB: sniff_n_frolic
     ports:
       - "5432:5432"
     volumes:
-      - sniff_n_frolic_pos_data:/var/lib/postgresql/data
+      - snf_api_db:/var/lib/postgresql/data
 
 volumes:
-  sniff_n_frolic_pos_data:
+  snf_api_db:

@@ -4,6 +4,19 @@ export type WooProductImage = {
   alt?: string;
 };
 
+export type WooProductCategory = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
+export type WooCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  parent: number;  // 0 = top-level
+};
+
 export type WooProduct = {
   id: number;
   slug: string;
@@ -23,27 +36,29 @@ export type WooProduct = {
   images?: WooProductImage[];
   date_created?: string;
   date_modified?: string;
+  categories?: WooProductCategory[];
 };
 
 export type ProductImportRow = {
-    wooProductId: number;
-    slug: string;
-    name: string;
-    shortDescription: string | null;
-    description: string | null;
-    sku: string | null;
-    productType: string;
-    status: string;
-    featured: boolean;
-    regularPrice: number;
-    salePrice: number | null;
-    effectivePrice: number;
-    currency: string;
-    stockStatus: string | null;
-    stockQuantity: number;
-    manageStock: boolean;
-    featuredImageUrl: string | null;
-    wooCreatedAt: Date | null;
-    wooUpdatedAt: Date | null;
-    syncSource: string;
+  wooProductId: number;
+  categoryId: string | null;       // UUID from product_categories
+  categoryIds: string[]; 
+  slug: string;
+  name: string;
+  shortDescription: string | null;
+  description: string | null;
+  sku: string | null;
+  productType: string;
+  status: string;
+  featured: boolean;
+  regularPrice: number;
+  salePrice: number | null;
+  currency: string;
+  stockStatus: string | null;
+  stockQuantity: number;
+  manageStock: boolean;
+  featuredImageUrl: string | null;
+  images: { url: string; altText: string | null; sortOrder: number; isFeatured: boolean }[];
+  wooCreatedAt: Date | null;
+  wooUpdatedAt: Date | null;
 };

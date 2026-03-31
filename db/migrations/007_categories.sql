@@ -1,8 +1,8 @@
 -- 007_categories.sql
 
-CREATE TABLE categories (
+CREATE TABLE product_categories (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  parent_id   UUID REFERENCES categories(id) ON DELETE SET NULL,
+  parent_id   UUID REFERENCES product_categories(id) ON DELETE SET NULL,
   name        TEXT NOT NULL,
   slug        TEXT NOT NULL UNIQUE,
   description TEXT,
@@ -11,14 +11,14 @@ CREATE TABLE categories (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_categories_parent ON categories(parent_id);
-CREATE INDEX idx_categories_slug   ON categories(slug);
+CREATE INDEX idx_product_categories_parent ON product_categories(parent_id);
+CREATE INDEX idx_product_categories_slug   ON product_categories(slug);
 
-CREATE TRIGGER trg_categories_updated_at
-  BEFORE UPDATE ON categories
+CREATE TRIGGER trg_product_categories_updated_at
+  BEFORE UPDATE ON product_categories
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Seed default category for migration
-INSERT INTO categories (name, slug, description)
+INSERT INTO product_categories (name, slug, description)
 VALUES ('Uncategorised', 'uncategorised', 'Default — reassign after migration')
 ON CONFLICT (slug) DO NOTHING;

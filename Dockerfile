@@ -8,6 +8,7 @@ RUN npm ci
 
 COPY . .
 RUN npm run build
+RUN ls -la dist/
 
 # ─── Production stage ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS production
@@ -23,6 +24,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/db ./db
 COPY migrate.sh ./migrate.sh
 RUN chmod +x migrate.sh
+RUN ls -la dist/
 
 EXPOSE 3000
 

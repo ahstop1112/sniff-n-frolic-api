@@ -9,7 +9,6 @@ export class AppController {
     private readonly databaseService: DatabaseService,
   ) {}
 
-  @Get()
   public getHello(): string {
     return this.appService.getHello();
   };

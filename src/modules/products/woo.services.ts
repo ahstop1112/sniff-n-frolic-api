@@ -63,7 +63,7 @@ export class WooService {
     const url = this.buildUrl('products/categories');
     url.searchParams.set('per_page', String(perPage));
     url.searchParams.set('page', String(page));
-    url.searchParams.set('_fields', 'id,name,slug,parent');
+    url.searchParams.set('_fields', 'id,name,slug,parent,image');
     return this.wooFetch<WooCategory[]>(url);
   };
 }

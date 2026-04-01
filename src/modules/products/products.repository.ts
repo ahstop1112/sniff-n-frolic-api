@@ -28,22 +28,25 @@ export class ProductsRepository {
     name: string;
     slug: string;
     parentSlug: string | null;
+    imageUrl: string | null;
   }): Promise<string> => {
     const result = await this.databaseService.query(
       `
-      INSERT INTO product_categories (name, slug, parent_id)
+      INSERT INTO product_categories (name, slug, parent_id, image_url)
       VALUES (
         $1,
         $2,
-        (SELECT id FROM product_categories WHERE slug = $3)
+        (SELECT id FROM product_categories WHERE slug = $3),
+        $4
       )
       ON CONFLICT (slug) DO UPDATE SET
         name       = EXCLUDED.name,
         parent_id  = EXCLUDED.parent_id,
+        image_url  = EXCLUDED.image_url,
         updated_at = NOW()
       RETURNING id
       `,
-      [cat.name, cat.slug, cat.parentSlug],
+      [cat.name, cat.slug, cat.parentSlug, cat.imageUrl],
     );
     return result.rows[0].id as string;
   };
@@ -183,7 +186,6 @@ export class ProductsRepository {
     const params: any[] = [limit, offset, status];
     const conditions: string[] = ['p.status = $3'];
 
-    // Use product_category_map for category filter (supports multiple categories)
     if (categorySlug) {
       params.push(categorySlug);
       conditions.push(`
@@ -217,9 +219,10 @@ export class ProductsRepository {
         p.status,
         p.stock_status,
         p.featured,
-        pc.id   AS category_id,
-        pc.name AS category_name,
-        pc.slug AS category_slug,
+        pc.id        AS category_id,
+        pc.name      AS category_name,
+        pc.slug      AS category_slug,
+        pc.image_url AS category_image_url,
         (
           SELECT json_agg(
             json_build_object(
@@ -265,9 +268,10 @@ export class ProductsRepository {
         p.stock_quantity,
         p.manage_stock,
         p.featured,
-        pc.id   AS category_id,
-        pc.name AS category_name,
-        pc.slug AS category_slug,
+        pc.id        AS category_id,
+        pc.name      AS category_name,
+        pc.slug      AS category_slug,
+        pc.image_url AS category_image_url,
         (
           SELECT json_agg(
             json_build_object(
@@ -299,6 +303,7 @@ export class ProductsRepository {
         pc.name,
         pc.slug,
         pc.description,
+        pc.image_url,
         pc.parent_id,
         parent.slug AS parent_slug,
         COUNT(DISTINCT pcm.product_id)::int AS count
@@ -317,7 +322,7 @@ export class ProductsRepository {
   public findCategoryBySlug = async (slug: string) => {
     const result = await this.databaseService.query(
       `
-      SELECT id, name, slug, description, parent_id
+      SELECT id, name, slug, description, image_url, parent_id
       FROM product_categories
       WHERE slug = $1
       `,
@@ -326,4 +331,4 @@ export class ProductsRepository {
 
     return result.rows[0] ?? null;
   };
-}
+} 

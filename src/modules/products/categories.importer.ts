@@ -24,7 +24,6 @@ export class CategoriesImporter {
     let page = 1;
     let totalImported = 0;
 
-    // Collect all categories first (need full list to resolve parent slugs)
     const allCategories: WooCategory[] = [];
 
     while (true) {
@@ -41,17 +40,18 @@ export class CategoriesImporter {
       wooIdToSlug.set(c.id, c.slug);
     }
 
-    // Upsert top-level first, then children (ensure parents exist)
-    const topLevel = allCategories.filter((c) => c.parent === 0);
-    const children = allCategories.filter((c) => c.parent !== 0);
+    // Upsert top-level first, then children
+    const topLevel = allCategories.filter((c) => c.parent === `0`);
+    const children = allCategories.filter((c) => c.parent !== `0`);
 
     for (const c of [...topLevel, ...children]) {
-      const parentSlug = c.parent !== 0 ? (wooIdToSlug.get(c.parent) ?? null) : null;
+      const parentSlug = c.parent !== `0` ? (wooIdToSlug.get(Number(c.parent)) ?? null) : null;
 
       await this.productsRepository.upsertCategoryWithParent({
         name: decodeHtmlEntities(c.name),
         slug: c.slug,
         parentSlug,
+        imageUrl: c.image?.src ?? null,
       });
 
       totalImported += 1;

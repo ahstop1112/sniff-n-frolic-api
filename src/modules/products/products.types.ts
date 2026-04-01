@@ -10,11 +10,18 @@ export type WooProductCategory = {
   slug: string;
 };
 
+export type WooCategoryImage = {
+  id?: number;
+  src: string;
+  alt?: string;
+};
+ 
 export type WooCategory = {
   id: number;
   name: string;
   slug: string;
-  parent: number;  // 0 = top-level
+  parent: string | null;
+  image?: WooCategoryImage | null;
 };
 
 export type WooProduct = {

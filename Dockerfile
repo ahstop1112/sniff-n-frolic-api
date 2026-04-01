@@ -20,7 +20,7 @@ RUN apk add --no-cache postgresql-client
 COPY package*.json ./
 RUN npm ci --only=production
 
-COPY --from=builder /ist ./dist
+COPY --from=builder /dist ./dist
 COPY --from=builder /db ./db
 COPY migrate.sh ./migrate.sh
 RUN chmod +x migrate.sh

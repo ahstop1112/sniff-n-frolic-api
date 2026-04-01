@@ -1,14 +1,10 @@
-
-Copy
-
 #!/bin/sh
-# migrate.sh — run all SQL migrations in order
- 
+echo "DATABASE_URL is: $DATABASE_URL"
 echo "Running migrations..."
- 
+
 for f in $(ls db/migrations/*.sql | sort); do
   echo "→ $f"
-  psql "$DATABASE_URL" -f "$f" || echo "Warning: $f had errors (may already exist)"
+  psql "$DATABASE_URL" -f "$f" || echo "Warning: $f had errors"
 done
- 
+
 echo "Migrations complete."

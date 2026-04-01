@@ -7,6 +7,11 @@ export class DatabaseService implements OnModuleDestroy {
   private readonly logger = new Logger(DatabaseService.name);
 
   constructor() {
+    this.logger.log(`NODE_ENV: ${process.env.NODE_ENV ?? 'undefined'}`);
+    this.logger.log(`PORT: ${process.env.PORT ?? 'undefined'}`);
+    this.logger.log(`DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
+    this.logger.log(`ENV keys count: ${Object.keys(process.env).length}`);
+
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL is not defined');
     }

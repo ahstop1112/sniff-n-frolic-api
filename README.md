@@ -1,98 +1,169 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Sniff N Frolic API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A unified NestJS backend powering both a retail point-of-sale system and an e-commerce store for Sniff N Frolic — a Canadian pet lifestyle brand.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Overview
 
-## Description
+This API serves as the single source of truth for two client applications:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **sniff-n-frolic-store** — Next.js e-commerce storefront (Vercel)
+- **sniff-n-frolic-pos** — React.js in-store point-of-sale system
 
-## Project setup
+Both clients share the same product catalogue, category structure, order management, and membership system through this API, replacing a previous dependency on WooCommerce.
 
-```bash
-$ npm install
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | NestJS (TypeScript) |
+| Database | PostgreSQL 16 |
+| Testing | Playwright (API tests) |
+| Deploy | Railway |
+| Clients | Next.js (Vercel) + React.js POS |
+
+## Architecture
+
+```
+sniff-n-frolic-store (Next.js / Vercel)  ─┐
+                                           ├──→ sniff-n-frolic-api (NestJS / Railway) ──→ PostgreSQL
+sniff-n-frolic-pos (React.js)            ─┘
 ```
 
-## Compile and run the project
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- Docker
+
+### Installation
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+### Environment Variables
+
+Create a `.env` file in the root:
+
+```env
+DATABASE_URL=postgresql://snf:postgres@localhost:5432/sniff_n_frolic
+WOO_API_BASE_URL=https://your-site.com/wp-json/wc/v3
+WOO_CONSUMER_KEY=ck_xxx
+WOO_CONSUMER_SECRET=cs_xxx
+PORT=4000
+```
+
+### Start the database
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run db:up
 ```
+
+### Run migrations
+
+```bash
+for f in db/migrations/*.sql; do
+  psql $DATABASE_URL -f "$f"
+done
+```
+
+### Start the API
+
+```bash
+# Development
+npm run start:dev
+
+# Production
+npm run start:prod
+```
+
+API runs on `http://localhost:4000` by default.
+
+## API Endpoints
+
+### Products
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/products` | List products (`?page`, `?limit`, `?category`, `?search`) |
+| `GET` | `/products/:slug` | Get product by slug |
+| `POST` | `/products/import/woocommerce` | Sync products from WooCommerce |
+
+### Categories
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/categories` | List all categories |
+| `GET` | `/categories/:slug` | Get category by slug |
+| `POST` | `/categories/import/woocommerce` | Sync categories from WooCommerce |
+
+### Auth
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/auth/request-code` | Request email login code |
+| `POST` | `/auth/verify-code` | Verify login code and issue JWT |
+| `GET` | `/auth/me` | Get current authenticated user |
+| `POST` | `/auth/logout` | Logout |
+
+## Database Schema
+
+```
+users                 → Staff accounts (POS)
+roles                 → Staff roles and permissions
+members               → Customer accounts (store)
+product_categories    → Categories with subcategory support
+products              → Shared product catalogue
+product_images        → Product image gallery
+product_category_map  → Product ↔ category (many-to-many)
+orders                → Orders from POS and online store
+order_items           → Line items per order
+```
+
+Migrations live in `db/migrations/` and run in numbered order (`001_`, `002_`, ...).
+
+## WooCommerce Sync
+
+Products and categories are periodically synced from WooCommerce into PostgreSQL. The platform is progressively reducing its WooCommerce dependency — all WooCommerce-specific columns are isolated and can be removed in a single migration when no longer needed.
+
+```bash
+# Sync categories first
+curl -X POST http://localhost:4000/categories/import/woocommerce
+
+# Then sync products
+curl -X POST http://localhost:4000/products/import/woocommerce
+```
+
+## Testing
+
+API tests are written with Playwright and cover all major endpoints including products, categories, filtering, pagination, and error handling.
+
+```bash
+# Run API tests
+npx playwright test tests/api.spec.ts
+
+# Interactive UI
+npx playwright test --ui
+```
+
+Tests run automatically on push to `main` via GitHub Actions.
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Deployed on Railway with a managed PostgreSQL instance. Migrations run automatically before each deployment via `migrate.sh`.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Docker
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Build
+docker build -t sniff-n-frolic-api .
+
+# Run
+docker run -p 4000:3000 --env-file .env sniff-n-frolic-api
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Related Repos
 
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- [`sniff-n-frolic-store`](https://github.com/ahstop1112/sniff-n-frolic-nextjs-store) — Next.js e-commerce storefront
+- [`sniff-n-frolic-pos`](https://github.com/ahstop1112/sniff-n-frolic-pos) — React.js point-of-sale

@@ -36,7 +36,7 @@ export class DatabaseService implements OnModuleDestroy {
     }
   }
 
-  // ✅ transaction support（超重要）
+  // ✅ transaction support
   public async transaction<T>(
     callback: (client: PoolClient) => Promise<T>,
   ): Promise<T> {

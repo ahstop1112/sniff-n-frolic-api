@@ -10,7 +10,7 @@ import { WooService } from './woo.services';
 
 @Module({
   imports: [ConfigModule],
-controllers: [ProductsController, CategoriesController],
+  controllers: [ProductsController, CategoriesController],
   providers: [ProductsImporter, CategoriesImporter, ProductsRepository, DatabaseService, WooService],
   exports: [ProductsImporter, CategoriesImporter, ProductsRepository],
 })

@@ -1,33 +1,33 @@
-import { ProductImportRow, WooProduct } from './products.types';
+import { ProductImportRow, WooProduct } from './products.types'
 
 const toCents = (value?: string | null): number | null => {
-  if (!value || value.trim() === '') return null;
-  const parsed = Number(value);
-  if (Number.isNaN(parsed)) return null;
-  return Math.round(parsed * 100);
-};
+  if (!value || value.trim() === '') return null
+  const parsed = Number(value)
+  if (Number.isNaN(parsed)) return null
+  return Math.round(parsed * 100)
+}
 
 const mapStatus = (status?: string): string => {
-  if (status === 'publish') return 'published';
-  if (status === 'trash') return 'archived';
-  return status || 'draft';
-};
+  if (status === 'publish') return 'published'
+  if (status === 'trash') return 'archived'
+  return status || 'draft'
+}
 
 const decodeHtmlEntities = (str: string): string =>
   str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'");
+    .replace(/&amp/g, '&')
+    .replace(/&lt/g, '<')
+    .replace(/&gt/g, '>')
+    .replace(/&quot/g, '"')
+    .replace(/&#039/g, "'")
 
 export const mapWooProductToImportRow = (
   product: WooProduct,
   categoryId: string | null,
   categoryIds: string[] = [],
 ): ProductImportRow => {
-  const regularPrice = toCents(product.regular_price) ?? 0;
-  const salePrice = toCents(product.sale_price);
+  const regularPrice = toCents(product.regular_price) ?? 0
+  const salePrice = toCents(product.sale_price)
 
   return {
     wooProductId: product.id,
@@ -56,5 +56,5 @@ export const mapWooProductToImportRow = (
     })),
     wooCreatedAt: product.date_created ? new Date(product.date_created) : null,
     wooUpdatedAt: product.date_modified ? new Date(product.date_modified) : null,
-  };
-};
+  }
+}

@@ -73,6 +73,7 @@ export class AuthService {
       message: 'Verification code sent.',
       expiresAt: loginCode.expires_at,
       resendAfter: loginCode.resend_after,
+      devCode: code,
     };
   };
 

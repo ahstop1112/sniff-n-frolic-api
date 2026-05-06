@@ -1,6 +1,6 @@
-import { Controller, Query, Get, Post, Param, NotFoundException } from '@nestjs/common';
-import { ProductsImporter } from './products.importer';
-import { ProductsRepository } from './products.repository';
+import { Controller, Query, Get, Post, Param, NotFoundException } from '@nestjs/common'
+import { ProductsImporter } from './products.importer'
+import { ProductsRepository } from './products.repository'
 
 @Controller('products')
 export class ProductsController {
@@ -22,27 +22,27 @@ export class ProductsController {
         limit: Number(limit),
         categorySlug,
         search,
-        });
+        })
     }
 
     // GET  /products/:slug                    → single product
     @Get(':slug')
     public async getProductBySlug(@Param('slug') slug: string) {
-        const product = await this.productsRepository.findBySlug(slug);
-        if (!product) throw new NotFoundException(`Product "${slug}" not found`);
-        return product;
+        const product = await this.productsRepository.findBySlug(slug)
+        if (!product) throw new NotFoundException(`Product "${slug}" not found`)
+        return product
     }
     
     // GET  /products/categories/:slug         → single category
     @Get('categories/:slug')
     public async getCategoryBySlug(@Param('slug') slug: string) {
-        const category = await this.productsRepository.findCategoryBySlug(slug);
-        if (!category) throw new NotFoundException(`Category "${slug}" not found`);
-        return category;
+        const category = await this.productsRepository.findCategoryBySlug(slug)
+        if (!category) throw new NotFoundException(`Category "${slug}" not found`)
+        return category
     }
     // POST /products/import/woocommerce       → woo sync
     @Post('import/woocommerce')
         public async importFromWooCommerce(){
-        return this.productsImporter.importAll();
-    };
+        return this.productsImporter.importAll()
+    }
 }

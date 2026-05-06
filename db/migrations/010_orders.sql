@@ -63,3 +63,8 @@ CREATE TABLE order_items (
 
 CREATE INDEX idx_order_items_order   ON order_items(order_id);
 CREATE INDEX idx_order_items_product ON order_items(product_id) WHERE product_id IS NOT NULL;
+
+ALTER TABLE orders
+  ADD COLUMN guest_name text NULL,
+  ADD COLUMN guest_email text NULL,
+  ADD COLUMN shipping_address jsonb NULL;

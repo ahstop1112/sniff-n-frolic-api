@@ -56,6 +56,21 @@ export class WooService {
     return this.wooFetch<WooProduct[]>(url);
   };
 
+  public fetchVariations = async (
+    productId: number,
+    page = 1,
+    perPage = 100,
+  ): Promise<WooProduct[]> => {
+    const url = this.buildUrl(`products/${productId}/variations`)
+    url.searchParams.set('per_page', String(perPage))
+    url.searchParams.set('page', String(page))
+    url.searchParams.set(
+      '_fields',
+      'id,slug,name,description,sku,status,regular_price,sale_price,price,stock_status,stock_quantity,manage_stock,images,date_created,date_modified,attributes,parent_id',
+    )
+    return this.wooFetch<WooProduct[]>(url)
+  }
+
   public fetchCategories = async (
     page: number,
     perPage = 100,

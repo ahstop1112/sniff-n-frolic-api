@@ -64,18 +64,19 @@ export class OrdersRepository {
     return this.databaseService.transaction(async (client) => {
       const orderRes = await client.query<Order>(
         `INSERT INTO orders
-          (source, status, subtotal, total, currency, staff_id, notes, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          (source, status, subtotal, total, currency, branch_id, staff_id, notes, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
           'pos',
-          'completed',       // POS 落單即係完成
+          'completed',
           subtotal,
           subtotal,
           dto.currency ?? 'CAD',
-          dto.staff_id,
-          dto.notes ?? null,
-          JSON.stringify({
+          dto.branch_id,      // $6
+          dto.staff_id,       // $7
+          dto.notes ?? null,  // $8
+          JSON.stringify({    // $9
             payment_method: dto.payment_method,
             amount_tendered: dto.amount_tendered,
             change: Math.max(0, dto.amount_tendered - subtotal),
@@ -102,54 +103,70 @@ export class OrdersRepository {
     })
   }
 
-  public getDailySummary = async () => {
+  public getDailySummary = async (branchId: string) => {
     const revenueRes = await this.databaseService.query<{
       total_revenue: string
       order_count: string
       item_count: string
     }>(
       `SELECT
-        COALESCE(SUM(o.total), 0)        AS total_revenue,
-        COUNT(DISTINCT o.id)             AS order_count,
-        COALESCE(SUM(oi.quantity), 0)    AS item_count
+        COALESCE(SUM(o.total), 0)     AS total_revenue,
+        COUNT(DISTINCT o.id)          AS order_count,
+        COALESCE(SUM(oi.quantity), 0) AS item_count
        FROM orders o
        LEFT JOIN order_items oi ON oi.order_id = o.id
+       JOIN branches b ON b.id = $1
        WHERE o.source = 'pos'
          AND o.status = 'completed'
-         AND o.created_at >= CURRENT_DATE`,
-      []
+         AND o.branch_id = $1
+         AND o.created_at >= (CURRENT_DATE AT TIME ZONE b.timezone)`,
+      [branchId]
     )
 
-    const topItemsRes = await this.databaseService.query<{
-      product_name: string
-      qty: string
-      total: string
+    const ordersRes = await this.databaseService.query<{
+      order_id: string
+      created_at: string
+      order_total: string
+      item_count: string
+      items: { name: string; qty: number; total: number }[]
     }>(
       `SELECT
-        oi.product_name,
-        SUM(oi.quantity)              AS qty,
-        SUM(oi.subtotal)              AS total
-       FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id
+        o.id          AS order_id,
+        o.created_at,
+        o.total       AS order_total,
+        COUNT(oi.id)  AS item_count,
+        json_agg(
+          json_build_object(
+            'name',  oi.product_name,
+            'qty',   oi.quantity,
+            'total', oi.subtotal
+          ) ORDER BY oi.created_at
+        ) AS items
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+       JOIN branches b ON b.id = $1
        WHERE o.source = 'pos'
          AND o.status = 'completed'
-         AND o.created_at >= CURRENT_DATE
-       GROUP BY oi.product_name
-       ORDER BY qty DESC
-       LIMIT 10`,
-      []
-    )
-
+         AND o.branch_id = $1
+         AND o.created_at >= (CURRENT_DATE AT TIME ZONE b.timezone)
+       GROUP BY o.id
+       ORDER BY o.created_at DESC`,
+      [branchId]
+    )  
+  
     const row = revenueRes.rows[0]
-
+  
     return {
       totalRevenue: Number(row.total_revenue),
       orderCount:   Number(row.order_count),
       itemCount:    Number(row.item_count),
-      topItems: topItemsRes.rows.map((r) => ({
-        name:  r.product_name,
-        qty:   Number(r.qty),
-        total: Number(r.total),
+      orders: ordersRes.rows.map((o, i) => ({
+        label:     `Order ${i + 1}`,
+        id:        o.order_id,
+        createdAt: o.created_at,
+        total:     Number(o.order_total),
+        itemCount: Number(o.item_count),
+        items:     o.items,
       })),
     }
   }
@@ -166,6 +183,14 @@ export class OrdersRepository {
     const result = await this.databaseService.query<OrderItem>(
       `SELECT * FROM order_items WHERE order_id = $1`,
       [orderId],
+    )
+    return result.rows
+  }
+
+  public findAllBranches = async () => {
+    const result = await this.databaseService.query(
+      `SELECT id, code, name, timezone FROM branches WHERE status = 'active' ORDER BY name`,
+      []
     )
     return result.rows
   }

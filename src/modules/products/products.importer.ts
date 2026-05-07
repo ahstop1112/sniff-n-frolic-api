@@ -45,19 +45,43 @@ export class ProductsImporter {
 
       for (const product of products) {
         const categories = product.categories ?? []
-
-        // Resolve all category UUIDs
         const categoryIds: string[] = []
         for (const cat of categories) {
           const id = await resolveCategoryId(cat.slug, cat.name)
           categoryIds.push(id)
         }
-
-        // First category = primary
         const categoryId = categoryIds[0] ?? null
 
-        const row = mapWooProductToImportRow(product, categoryId, categoryIds)
-        await this.productsRepository.upsertImportedProduct(row)
+        if (product.type === 'variable') {
+          let varPage = 1
+          while (true) {
+            const variations = await this.wooService.fetchVariations(
+              product.id,
+              varPage
+            )
+            if (!variations.length) break
+        
+            for (const variation of variations) {
+              const variationWithMeta = {
+                ...variation,
+                type: 'variation',
+                name: variation.name
+                  ? `${product.name} — ${variation.name}`
+                  : product.name,
+                categories: product.categories,
+                slug: `${product.slug}-${variation.id}`,
+                images: variation.image ? [variation.image] : product.images,
+              }
+              const row = mapWooProductToImportRow(variationWithMeta, categoryId, categoryIds)
+              await this.productsRepository.upsertImportedProduct(row)
+            }
+        
+            varPage++
+          }
+        } else {
+          const row = mapWooProductToImportRow(product, categoryId, categoryIds)
+          await this.productsRepository.upsertImportedProduct(row)
+        }
       }
 
       totalImported += products.length

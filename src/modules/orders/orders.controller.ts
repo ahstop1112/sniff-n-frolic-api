@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Param, Body } from '@nestjs/common'
+import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common'
 import { OrdersService } from './orders.service'
 import type { CreateOrderDto } from './dto/create-order.dto'
+import type { CreatePOSOrderDto } from './dto/create-pos-order.dto'
 
 @Controller('orders')
 export class OrdersController {
@@ -9,6 +10,21 @@ export class OrdersController {
   @Post()
   create(@Body() dto: CreateOrderDto) {
     return this.service.createOrder(dto)
+  }
+
+  @Post('pos')
+  createPOS(@Body() dto: CreatePOSOrderDto) {
+    return this.service.createPOSOrder(dto)
+  }
+
+  @Get('summary/today')
+  getDailySummary(@Query('branchId') branchId: string) {
+    return this.service.getDailySummary(branchId)
+  }
+
+  @Get('branches')
+  getBranches() {
+    return this.service.getBranches()
   }
 
   @Get(':id')

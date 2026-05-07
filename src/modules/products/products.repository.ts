@@ -184,7 +184,7 @@ export class ProductsRepository {
   }) => {
     const offset = (page - 1) * limit
     const params: any[] = [limit, offset, status]
-    const conditions: string[] = ['p.status = $3']
+    const conditions: string[] = ['p.status = $3', "p.product_type != 'variation'"]
 
     if (categorySlug) {
       params.push(categorySlug)
@@ -218,11 +218,19 @@ export class ProductsRepository {
         p.featured_image_url,
         p.status,
         p.stock_status,
+        p.product_type,
         p.featured,
         pc.id        AS category_id,
         pc.name      AS category_name,
         pc.slug      AS category_slug,
         pc.image_url AS category_image_url,
+        (
+          SELECT MIN(v.effective_price)
+          FROM products v
+          WHERE v.product_type = 'variation'
+            AND v.slug LIKE p.slug || '-%'
+            AND v.status = 'published'
+        ) AS min_variation_price,
         (
           SELECT json_agg(
             json_build_object(
@@ -268,10 +276,8 @@ export class ProductsRepository {
         p.stock_quantity,
         p.manage_stock,
         p.featured,
-        pc.id        AS category_id,
-        pc.name      AS category_name,
-        pc.slug      AS category_slug,
-        pc.image_url AS category_image_url,
+        pc.name AS category_name,
+        pc.slug AS category_slug,
         (
           SELECT json_agg(
             json_build_object(
@@ -283,7 +289,27 @@ export class ProductsRepository {
           )
           FROM product_images pi
           WHERE pi.product_id = p.id
-        ) AS images
+        ) AS images,
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', v.id,
+              'slug', v.slug,
+              'name', v.name,
+              'sku', v.sku,
+              'regular_price', v.regular_price,
+              'sale_price', v.sale_price,
+              'effective_price', v.effective_price,
+              'stock_status', v.stock_status,
+              'stock_quantity', v.stock_quantity,
+              'featured_image_url', v.featured_image_url
+            )
+          )
+          FROM products v
+          WHERE v.slug LIKE p.slug || '-%'
+            AND v.product_type = 'variation'
+            AND v.status = 'published'
+        ) AS variations
       FROM products p
       LEFT JOIN product_categories pc ON pc.id = p.category_id
       WHERE p.slug = $1
@@ -291,7 +317,7 @@ export class ProductsRepository {
       `,
       [slug],
     )
-
+  
     return result.rows[0] ?? null
   }
 

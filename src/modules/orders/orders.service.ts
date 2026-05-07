@@ -22,7 +22,11 @@ export class OrdersService {
     return { ...order, items }
   }
 
-  async getDailySummary() {
-    return this.repo.getDailySummary()
+  async getDailySummary(branchId: string) {
+    return this.repo.getDailySummary(branchId)
+  }
+
+  async getBranches() {
+    return this.repo.findAllBranches()
   }
 }

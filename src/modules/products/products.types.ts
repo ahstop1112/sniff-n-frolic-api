@@ -24,6 +24,13 @@ export type WooCategory = {
   image?: WooCategoryImage | null;
 };
 
+export interface WooVariationAttribute {
+  id: number;
+  name: string;
+  slug: string;
+  option: string;
+}
+
 export type WooProduct = {
   id: number;
   slug: string;
@@ -46,6 +53,10 @@ export type WooProduct = {
   date_modified?: string;
   categories?: WooProductCategory[];
 };
+
+export interface WooVariation extends WooProduct {
+  attributes: WooVariationAttribute[];
+}
 
 export type ProductImportRow = {
   wooProductId: number;

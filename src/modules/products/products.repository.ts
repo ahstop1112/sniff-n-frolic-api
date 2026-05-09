@@ -302,14 +302,32 @@ export class ProductsRepository {
               'effective_price', v.effective_price,
               'stock_status', v.stock_status,
               'stock_quantity', v.stock_quantity,
-              'featured_image_url', v.featured_image_url
+              'featured_image_url', v.featured_image_url,
+              'attributes', (
+                SELECT json_agg(
+                  json_build_object(
+                    'name', va.name,
+                    'slug', va.slug,
+                    'option', va.option_value
+                  )
+                )
+                FROM product_variation_attributes va
+                WHERE va.variation_id = v.id
+              )
             )
           )
           FROM products v
           WHERE v.slug LIKE p.slug || '-%'
             AND v.product_type = 'variation'
             AND v.status = 'published'
-        ) AS variations
+        ) AS variations,
+        (
+          SELECT MIN(v.effective_price)
+          FROM products v
+          WHERE v.product_type = 'variation'
+            AND v.slug LIKE p.slug || '-%'
+            AND v.status = 'published'
+        ) AS min_variation_price
       FROM products p
       LEFT JOIN product_categories pc ON pc.id = p.category_id
       WHERE p.slug = $1
@@ -319,6 +337,23 @@ export class ProductsRepository {
     )
   
     return result.rows[0] ?? null
+  }
+
+  public upsertVariationAttributes = async (
+    variationId: string,
+    attributes: { name: string; slug: string; optionValue: string }[],
+  ): Promise<void> => {
+    await this.databaseService.query(
+      `DELETE FROM product_variation_attributes WHERE variation_id = $1`,
+      [variationId],
+    )
+    for (const attr of attributes) {
+      await this.databaseService.query(
+        `INSERT INTO product_variation_attributes (variation_id, name, slug, option_value)
+         VALUES ($1, $2, $3, $4)`,
+        [variationId, attr.name, attr.slug, attr.optionValue],
+      )
+    }
   }
 
   public findAllCategories = async () => {

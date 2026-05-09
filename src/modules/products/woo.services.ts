@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { WooProduct, WooCategory } from './products.types';
+import { WooProduct, WooVariation, WooCategory } from './products.types';
 
 @Injectable()
 export class WooService {
@@ -60,7 +60,7 @@ export class WooService {
     productId: number,
     page = 1,
     perPage = 100,
-  ): Promise<WooProduct[]> => {
+  ): Promise<WooVariation[]> => {
     const url = this.buildUrl(`products/${productId}/variations`)
     url.searchParams.set('per_page', String(perPage))
     url.searchParams.set('page', String(page))
@@ -68,7 +68,7 @@ export class WooService {
       '_fields',
       'id,slug,name,description,sku,status,regular_price,sale_price,price,stock_status,stock_quantity,manage_stock,images,date_created,date_modified,attributes,parent_id',
     )
-    return this.wooFetch<WooProduct[]>(url)
+    return this.wooFetch<WooVariation[]>(url)
   }
 
   public fetchCategories = async (

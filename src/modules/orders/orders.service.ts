@@ -29,4 +29,17 @@ export class OrdersService {
   async getBranches() {
     return this.repo.findAllBranches()
   }
+
+  async completeOrder(id: string, paymentIntentId: string) {
+    const order = await this.repo.findById(id)
+    if (!order) throw new NotFoundException(`Order ${id} not found`)
+
+    if (['processing', 'completed'].includes(order.status)) {
+      return { ok: true, order, alreadyCompleted: true }
+    }
+
+    const updated = await this.repo.findById(id)
+    const items = await this.repo.findItemsByOrderId(id)
+    return { ok: true, order: { ...updated, items } }
+  }
 }

@@ -6,8 +6,9 @@ import type { CreatePOSOrderDto } from './dto/create-pos-order.dto'
 
 @Injectable()
 export class OrdersRepository {
-  public constructor(private readonly databaseService: DatabaseService) {}
-
+  public constructor(private readonly databaseService: DatabaseService) { }
+  
+  // Next JS storefront order creation flow
   public createOrder = async (dto: CreateOrderDto): Promise<Order> => {
     const subtotal = dto.items.reduce(
       (sum, item) => sum + item.unit_price * item.quantity,
@@ -17,14 +18,16 @@ export class OrdersRepository {
     return this.databaseService.transaction(async (client) => {
       const orderRes = await client.query<Order>(
         `INSERT INTO orders
-          (source, status, subtotal, total, currency, guest_name, guest_email, shipping_address, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         RETURNING *`,
+          (source, status, subtotal, shipping, tax, total, currency, guest_name, guest_email, shipping_address, notes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *`,
         [
           'online',
           'pending',
           subtotal,
-          subtotal,
+          dto.shipping,  // $4
+          dto.tax,       // $5
+          dto.total,
           dto.currency ?? 'CAD',
           dto.guest_name,
           dto.guest_email,
@@ -56,6 +59,30 @@ export class OrdersRepository {
     })
   }
 
+  public completeOrder = async (
+    id: string,
+    paymentIntentId: string,
+  ): Promise<Order | null> => {
+    const result = await this.databaseService.query<Order>(
+      `UPDATE orders
+      SET status = 'processing',
+          metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+          updated_at = NOW()
+      WHERE id = $1
+      RETURNING *`,
+      [
+        id,
+        JSON.stringify({
+          payment_intent_id: paymentIntentId,
+          paid_at: new Date().toISOString(),
+          paid_via: 'stripe_nextjs',
+        }),
+      ],
+    )
+    return result.rows[0] ?? null
+  }
+
+  // POS storefront order creation flow
   public createPOSOrder = async (dto: CreatePOSOrderDto): Promise<Order> => {
     const subtotal = dto.items.reduce(
       (sum, item) => sum + item.unit_price * item.quantity, 0
@@ -194,4 +221,6 @@ export class OrdersRepository {
     )
     return result.rows
   }
+
+
 }

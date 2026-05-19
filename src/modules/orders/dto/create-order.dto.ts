@@ -15,4 +15,7 @@ export interface CreateOrderDto {
   items: CreateOrderItemDto[]
   notes?: string
   currency?: string
+  shipping: number  // cents
+  tax: number       // cents
+  total: number
 }

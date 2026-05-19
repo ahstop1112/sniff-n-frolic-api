@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { DatabaseService } from '../../database/database.service'
 import { ProductImportRow } from './products.types'
+import type { UpdateProductDto } from './dto/update-product.dto'
+import type { CreateProductDto } from './dto/create-product.dto'
 
 @Injectable()
 export class ProductsRepository {
@@ -391,5 +393,142 @@ export class ProductsRepository {
     )
 
     return result.rows[0] ?? null
+  }
+
+  public findForManage = async ({
+    page,
+    limit,
+    search,
+  }: {
+    page: number
+    limit: number
+    search?: string
+  }) => {
+    const offset = (page - 1) * limit
+    const params: any[] = [limit, offset]
+    const conditions: string[] = ["p.product_type != 'variation'"]
+  
+    if (search) {
+      params.push(`%${search}%`)
+      conditions.push(`p.name ILIKE $${params.length}`)
+    }
+  
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  
+    const result = await this.databaseService.query(
+      `
+      SELECT
+        p.id,
+        p.name,
+        p.slug,
+        p.sku,
+        p.product_type,
+        p.status,
+        p.regular_price,
+        p.sale_price,
+        p.effective_price,
+        p.stock_status,
+        p.stock_quantity,
+        p.featured_image_url,
+        p.updated_at,
+        pc.name AS category_name
+      FROM products p
+      LEFT JOIN product_categories pc ON pc.id = p.category_id
+      ${where}
+      ORDER BY p.updated_at DESC
+      LIMIT $1 OFFSET $2
+      `,
+      params,
+    )
+  
+    return result.rows
+  }
+  
+  public updateProduct = async (id: string, dto: UpdateProductDto) => {
+    const fields: string[] = []
+    const values: any[] = []
+    let idx = 1
+  
+    if (dto.name !== undefined)               { fields.push(`name = $${idx++}`);                values.push(dto.name) }
+    if (dto.slug !== undefined)               { fields.push(`slug = $${idx++}`);                values.push(dto.slug) }
+    if (dto.short_description !== undefined)  { fields.push(`short_description = $${idx++}`);   values.push(dto.short_description) }
+    if (dto.description !== undefined)        { fields.push(`description = $${idx++}`);         values.push(dto.description) }
+    if (dto.regular_price !== undefined)      { fields.push(`regular_price = $${idx++}`);       values.push(dto.regular_price) }
+    if (dto.sale_price !== undefined)         { fields.push(`sale_price = $${idx++}`);          values.push(dto.sale_price) }
+    if (dto.stock_quantity !== undefined)     { fields.push(`stock_quantity = $${idx++}`);      values.push(dto.stock_quantity) }
+    if (dto.stock_status !== undefined)       { fields.push(`stock_status = $${idx++}`);        values.push(dto.stock_status) }
+    if (dto.status !== undefined)             { fields.push(`status = $${idx++}`);              values.push(dto.status) }
+    if (dto.featured_image_url !== undefined) { fields.push(`featured_image_url = $${idx++}`); values.push(dto.featured_image_url) }
+    if (dto.meta_title !== undefined)         { fields.push(`meta_title = $${idx++}`);          values.push(dto.meta_title) }
+    if (dto.meta_description !== undefined)   { fields.push(`meta_description = $${idx++}`);   values.push(dto.meta_description) }
+  
+    if (fields.length === 0) return null
+  
+    fields.push(`updated_at = NOW()`)
+    values.push(id)
+  
+    const result = await this.databaseService.query(
+      `UPDATE products SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values,
+    )
+  
+    return result.rows[0] ?? null
+  }
+  
+  public createProduct = async (dto: CreateProductDto) => {
+    // Auto-generate slug from name if not provided
+    const slug = dto.slug?.trim() || dto.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+  
+    const result = await this.databaseService.query(
+      `
+      INSERT INTO products (
+        name, slug, category_id, short_description, description,
+        regular_price, sale_price, stock_quantity, stock_status,
+        status, featured_image_url, meta_title, meta_description,
+        product_type, currency, manage_stock
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'simple','CAD',false)
+      RETURNING *
+      `,
+      [
+        dto.name,
+        slug,
+        dto.category_id ?? null,
+        dto.short_description ?? null,
+        dto.description ?? null,
+        dto.regular_price,
+        dto.sale_price ?? null,
+        dto.stock_quantity ?? 0,
+        dto.stock_status ?? 'instock',
+        dto.status ?? 'draft',
+        dto.featured_image_url ?? null,
+        dto.meta_title ?? null,
+        dto.meta_description ?? null,
+      ]
+    )
+  
+    return result.rows[0]
+  }
+
+  public updateProductImages = async (
+    productId: string,
+    images: { url: string; alt_text: string | null; sort_order: number; is_featured: boolean }[]
+  ) => {
+    await this.databaseService.query(
+      `DELETE FROM product_images WHERE product_id = $1`,
+      [productId]
+    )
+
+    for (const img of images) {
+      await this.databaseService.query(
+        `INSERT INTO product_images (product_id, url, alt_text, sort_order, is_featured)
+        VALUES ($1, $2, $3, $4, $5)`,
+        [productId, img.url, img.alt_text, img.sort_order, img.is_featured]
+      )
+    }
   }
 } 

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common'
+import { Controller, Post, Get, Patch, Param, Body, Query } from '@nestjs/common'
 import { OrdersService } from './orders.service'
 import type { CreateOrderDto } from './dto/create-order.dto'
 import type { CreatePOSOrderDto } from './dto/create-pos-order.dto'
@@ -30,5 +30,10 @@ export class OrdersController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.getOrder(id)
+  }
+
+  @Patch(':id/complete')
+  complete(@Param('id') id: string, @Body() body: { paymentIntentId: string }) {
+    return this.service.completeOrder(id, body.paymentIntentId)
   }
 }

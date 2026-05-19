@@ -1,4 +1,4 @@
-# Sniff N Frolic API
+# Sniff N Frolic API (NodeJS + NestJS)
 
 A unified NestJS backend powering both a retail point-of-sale system and an e-commerce store for Sniff N Frolic — a Canadian pet lifestyle brand.
 

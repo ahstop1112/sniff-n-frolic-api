@@ -12,7 +12,16 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors();
+  app.enableCors({
+  origin: [
+      'https://sniffnfrolic.com',
+      'https://www.sniffnfrolic.com',
+      ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:3001'] : []),
+    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  });
+  
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

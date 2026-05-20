@@ -8,6 +8,32 @@ import type { CreateProductDto } from './dto/create-product.dto'
 export class ProductsRepository {
   public constructor(private readonly databaseService: DatabaseService) {}
 
+  public createCategory = async (name: string) => {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+
+    const result = await this.databaseService.query(
+      `INSERT INTO product_categories (name, slug)
+       VALUES ($1, $2)
+       RETURNING id, name, slug`,
+      [name, slug],
+    )
+    return result.rows[0]
+  }
+
+  public updateCategory = async (id: string, name: string) => {
+    const result = await this.databaseService.query(
+      `UPDATE product_categories SET name = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, name, slug`,
+      [name, id],
+    )
+    return result.rows[0] ?? null
+  }
+
   public upsertCategory = async (wooCategory: {
     name: string
     slug: string
@@ -278,8 +304,14 @@ export class ProductsRepository {
         p.stock_quantity,
         p.manage_stock,
         p.featured,
-        pc.name AS category_name,
-        pc.slug AS category_slug,
+        p.meta_title,
+        p.meta_description,
+        (
+          SELECT json_agg(json_build_object('id', pc2.id, 'name', pc2.name, 'slug', pc2.slug))
+          FROM product_category_map pcm2
+          JOIN product_categories pc2 ON pc2.id = pcm2.category_id
+          WHERE pcm2.product_id = p.id
+        ) AS categories,
         (
           SELECT json_agg(
             json_build_object(
@@ -331,7 +363,6 @@ export class ProductsRepository {
             AND v.status = 'published'
         ) AS min_variation_price
       FROM products p
-      LEFT JOIN product_categories pc ON pc.id = p.category_id
       WHERE p.slug = $1
         AND p.status = 'published'
       `,
@@ -431,10 +462,15 @@ export class ProductsRepository {
         p.stock_quantity,
         p.featured_image_url,
         p.updated_at,
-        pc.name AS category_name
+        COALESCE(
+          json_agg(pc.name ORDER BY pc.name) FILTER (WHERE pc.name IS NOT NULL),
+          '[]'
+        ) AS category_names
       FROM products p
-      LEFT JOIN product_categories pc ON pc.id = p.category_id
+      LEFT JOIN product_category_map pcm ON pcm.product_id = p.id
+      LEFT JOIN product_categories pc ON pc.id = pcm.category_id
       ${where}
+      GROUP BY p.id
       ORDER BY p.updated_at DESC
       LIMIT $1 OFFSET $2
       `,
@@ -463,15 +499,19 @@ export class ProductsRepository {
     if (dto.meta_description !== undefined)   { fields.push(`meta_description = $${idx++}`);   values.push(dto.meta_description) }
   
     if (fields.length === 0) return null
-  
+
     fields.push(`updated_at = NOW()`)
     values.push(id)
-  
+
     const result = await this.databaseService.query(
       `UPDATE products SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
       values,
     )
-  
+
+    if (dto.category_ids !== undefined) {
+      await this.syncCategoryMap(id, dto.category_ids)
+    }
+
     return result.rows[0] ?? null
   }
   
@@ -486,7 +526,7 @@ export class ProductsRepository {
     const result = await this.databaseService.query(
       `
       INSERT INTO products (
-        name, slug, category_id, short_description, description,
+        name, slug, short_description, description,
         regular_price, sale_price, stock_quantity, stock_status,
         status, featured_image_url, meta_title, meta_description,
         product_type, currency, manage_stock
@@ -497,7 +537,6 @@ export class ProductsRepository {
       [
         dto.name,
         slug,
-        dto.category_id ?? null,
         dto.short_description ?? null,
         dto.description ?? null,
         dto.regular_price,
@@ -510,8 +549,35 @@ export class ProductsRepository {
         dto.meta_description ?? null,
       ]
     )
-  
-    return result.rows[0]
+
+    const product = result.rows[0]
+
+    if (dto.category_ids && dto.category_ids.length > 0) {
+      await this.syncCategoryMap(product.id, dto.category_ids)
+    }
+
+    return product
+  }
+
+  private syncCategoryMap = async (productId: string, categoryIds: string[]): Promise<void> => {
+    await this.databaseService.query(
+      `DELETE FROM product_category_map WHERE product_id = $1`,
+      [productId],
+    )
+    for (const categoryId of categoryIds) {
+      await this.databaseService.query(
+        `INSERT INTO product_category_map (product_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [productId, categoryId],
+      )
+    }
+  }
+
+  public deleteProduct = async (id: string): Promise<boolean> => {
+    const result = await this.databaseService.query(
+      `UPDATE products SET status = 'archived', updated_at = NOW() WHERE id = $1 RETURNING id`,
+      [id],
+    )
+    return (result.rowCount ?? 0) > 0
   }
 
   public updateProductImages = async (

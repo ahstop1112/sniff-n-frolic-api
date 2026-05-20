@@ -1,6 +1,7 @@
 export interface UpdateProductDto {
     name?: string
     slug?: string
+    category_ids?: string[]       // multi-category (synced to product_category_map)
     short_description?: string | null
     description?: string | null
     regular_price?: number        // cents
@@ -12,4 +13,3 @@ export interface UpdateProductDto {
     meta_title?: string | null
     meta_description?: string | null
 }
-  

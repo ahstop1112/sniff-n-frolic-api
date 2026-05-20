@@ -16,7 +16,11 @@ async function bootstrap() {
   origin: [
       'https://sniffnfrolic.com',
       'https://www.sniffnfrolic.com',
-      ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:3001'] : []),
+      ...(process.env.NODE_ENV !== 'production' ?
+        [ 'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:5173'
+        ] : []),
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,

@@ -1,7 +1,8 @@
 export interface CreateProductDto {
     name: string
     slug?: string                 // auto-generate if empty
-    category_id?: string | null
+    category_id?: string | null   // kept for WooCommerce import compat
+    category_ids?: string[]       // multi-category (synced to product_category_map)
     short_description?: string | null
     description?: string | null
     regular_price: number         // cents

@@ -19,6 +19,7 @@
     "test:local": "API_BASE_URL=https://sniff-n-frolic-api-production.up.railway.app playwright test tests/api.spec.ts --project=chromium"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",

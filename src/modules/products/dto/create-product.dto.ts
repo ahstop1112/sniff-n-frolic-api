@@ -3,6 +3,7 @@ export interface CreateProductDto {
     slug?: string                 // auto-generate if empty
     category_id?: string | null   // kept for WooCommerce import compat
     category_ids?: string[]       // multi-category (synced to product_category_map)
+    brand_ids?: string[]          // multi-brand (synced to product_brand_map)
     short_description?: string | null
     description?: string | null
     regular_price: number         // cents
@@ -13,4 +14,5 @@ export interface CreateProductDto {
     featured_image_url?: string | null
     meta_title?: string | null
     meta_description?: string | null
+    
 }

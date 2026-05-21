@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common'
 import { DatabaseService } from '../../database/database.service'
+import { BrandsRepository } from '../brands/brands.repository'
 import { ProductImportRow } from './products.types'
 import type { UpdateProductDto } from './dto/update-product.dto'
 import type { CreateProductDto } from './dto/create-product.dto'
 
 @Injectable()
 export class ProductsRepository {
-  public constructor(private readonly databaseService: DatabaseService) {}
+  public constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly brandsRepository: BrandsRepository,
+  ) { }
 
   public createCategory = async (name: string) => {
     const slug = name
@@ -306,11 +310,23 @@ export class ProductsRepository {
         p.featured,
         p.meta_title,
         p.meta_description,
-        (
-          SELECT json_agg(json_build_object('id', pc2.id, 'name', pc2.name, 'slug', pc2.slug))
-          FROM product_category_map pcm2
-          JOIN product_categories pc2 ON pc2.id = pcm2.category_id
-          WHERE pcm2.product_id = p.id
+        COALESCE(
+          (
+            SELECT json_agg(json_build_object('id', b.id, 'name', b.name, 'slug', b.slug))
+            FROM product_brand_map pbm
+            JOIN brands b ON b.id = pbm.brand_id
+            WHERE pbm.product_id = p.id
+          ),
+          '[]'::json
+        ) AS brands,
+        COALESCE(
+          (
+            SELECT json_agg(json_build_object('id', pc2.id, 'name', pc2.name, 'slug', pc2.slug))
+            FROM product_category_map pcm2
+            JOIN product_categories pc2 ON pc2.id = pcm2.category_id
+            WHERE pcm2.product_id = p.id
+          ),
+          '[]'::json
         ) AS categories,
         (
           SELECT json_agg(
@@ -463,6 +479,15 @@ export class ProductsRepository {
         p.featured_image_url,
         p.updated_at,
         COALESCE(
+          (
+            SELECT json_agg(b.name ORDER BY b.name)
+            FROM product_brand_map pbm
+            JOIN brands b ON b.id = pbm.brand_id
+            WHERE pbm.product_id = p.id
+          ),
+          '[]'
+        ) AS brand_names,
+        COALESCE(
           json_agg(pc.name ORDER BY pc.name) FILTER (WHERE pc.name IS NOT NULL),
           '[]'
         ) AS category_names
@@ -497,7 +522,9 @@ export class ProductsRepository {
     if (dto.featured_image_url !== undefined) { fields.push(`featured_image_url = $${idx++}`); values.push(dto.featured_image_url) }
     if (dto.meta_title !== undefined)         { fields.push(`meta_title = $${idx++}`);          values.push(dto.meta_title) }
     if (dto.meta_description !== undefined)   { fields.push(`meta_description = $${idx++}`);   values.push(dto.meta_description) }
-  
+    if (dto.brand_ids !== undefined) {
+      await this.brandsRepository.syncBrandMap(id, dto.brand_ids)
+    }
     if (fields.length === 0) return null
 
     fields.push(`updated_at = NOW()`)
@@ -554,6 +581,10 @@ export class ProductsRepository {
 
     if (dto.category_ids && dto.category_ids.length > 0) {
       await this.syncCategoryMap(product.id, dto.category_ids)
+    }
+
+    if (dto.brand_ids && dto.brand_ids.length > 0) {
+      await this.brandsRepository.syncBrandMap(product.id, dto.brand_ids)
     }
 
     return product

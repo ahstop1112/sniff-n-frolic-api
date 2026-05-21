@@ -2,6 +2,7 @@ export interface UpdateProductDto {
     name?: string
     slug?: string
     category_ids?: string[]       // multi-category (synced to product_category_map)
+    brand_ids?: string[]          // multi-brand (synced to product_brand_map)
     short_description?: string | null
     description?: string | null
     regular_price?: number        // cents

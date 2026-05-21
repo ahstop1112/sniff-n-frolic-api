@@ -46,7 +46,6 @@ test.describe('GET /products', () => {
     expect(res.status()).toBe(200);
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
-    // All results should contain "chicken" in name (case insensitive)
     for (const p of data) {
       expect(p.name.toLowerCase()).toContain('chicken');
     }
@@ -95,11 +94,26 @@ test.describe('GET /products/:slug', () => {
     }
   });
 
-  test('includes category info', async ({ request }) => {
+  test('includes categories array', async ({ request }) => {
     const res = await request.get(`${API_BASE}/products/chicken-breast-dehydrated-pet-treats`);
     const data = await res.json();
-    expect(data).toHaveProperty('category_name');
-    expect(data).toHaveProperty('category_slug');
+    expect(Array.isArray(data.categories)).toBe(true);
+    if (data.categories.length > 0) {
+      expect(data.categories[0]).toHaveProperty('id');
+      expect(data.categories[0]).toHaveProperty('name');
+      expect(data.categories[0]).toHaveProperty('slug');
+    }
+  });
+
+  test('includes brands array', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/products/chicken-breast-dehydrated-pet-treats`);
+    const data = await res.json();
+    expect(Array.isArray(data.brands)).toBe(true);
+    if (data.brands.length > 0) {
+      expect(data.brands[0]).toHaveProperty('id');
+      expect(data.brands[0]).toHaveProperty('name');
+      expect(data.brands[0]).toHaveProperty('slug');
+    }
   });
 });
 
@@ -128,7 +142,6 @@ test.describe('GET /categories', () => {
   test('includes image_url', async ({ request }) => {
     const res = await request.get(`${API_BASE}/categories`);
     const data = await res.json();
-    // At least some categories should have image_url
     const withImage = data.filter((c: any) => c.image_url !== null);
     expect(withImage.length).toBeGreaterThan(0);
   });
@@ -161,6 +174,81 @@ test.describe('GET /categories/:slug', () => {
 
   test('returns 404 for unknown slug', async ({ request }) => {
     const res = await request.get(`${API_BASE}/categories/this-does-not-exist`);
+    expect(res.status()).toBe(404);
+  });
+});
+
+// ─── Brands ───────────────────────────────────────────────────────────────────
+
+test.describe('GET /brands', () => {
+  test('returns array of brands', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/brands`);
+    expect(res.status()).toBe(200);
+    const data = await res.json();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data.length).toBeGreaterThan(0);
+  });
+
+  test('returns correct brand shape', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/brands`);
+    const data = await res.json();
+    const brand = data[0];
+    expect(brand).toHaveProperty('id');
+    expect(brand).toHaveProperty('name');
+    expect(brand).toHaveProperty('slug');
+  });
+
+  test('returns brands sorted by name', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/brands`);
+    const data = await res.json();
+    const names = data.map((b: any) => b.name as string)
+    const sorted = [...names].sort((a, b) => a.localeCompare(b))
+    expect(names).toEqual(sorted)
+  });
+});
+
+test.describe('POST /brands', () => {
+  test('creates a new brand', async ({ request }) => {
+    const res = await request.post(`${API_BASE}/brands`, {
+      data: { name: 'Test Brand E2E' },
+    });
+    expect(res.status()).toBe(201);
+    const data = await res.json();
+    expect(data).toHaveProperty('id');
+    expect(data.name).toBe('Test Brand E2E');
+    expect(data.slug).toBe('test-brand-e2e');
+  });
+
+  test('auto-generates slug from name', async ({ request }) => {
+    const res = await request.post(`${API_BASE}/brands`, {
+      data: { name: 'My Test Brand 123' },
+    });
+    const data = await res.json();
+    expect(data.slug).toBe('my-test-brand-123');
+  });
+});
+
+test.describe('PUT /brands/:id', () => {
+  test('updates brand name', async ({ request }) => {
+    // Create first
+    const createRes = await request.post(`${API_BASE}/brands`, {
+      data: { name: 'Brand To Update' },
+    });
+    const created = await createRes.json();
+
+    // Update
+    const updateRes = await request.put(`${API_BASE}/brands/${created.id}`, {
+      data: { name: 'Updated Brand Name' },
+    });
+    expect(updateRes.status()).toBe(200);
+    const updated = await updateRes.json();
+    expect(updated.name).toBe('Updated Brand Name');
+  });
+
+  test('returns 404 for unknown id', async ({ request }) => {
+    const res = await request.put(`${API_BASE}/brands/00000000-0000-0000-0000-000000000000`, {
+      data: { name: 'Ghost Brand' },
+    });
     expect(res.status()).toBe(404);
   });
 });

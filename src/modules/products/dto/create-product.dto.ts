@@ -1,18 +1,18 @@
 export interface CreateProductDto {
-    name: string
-    slug?: string                 // auto-generate if empty
-    category_id?: string | null   // kept for WooCommerce import compat
-    category_ids?: string[]       // multi-category (synced to product_category_map)
-    brand_ids?: string[]          // multi-brand (synced to product_brand_map)
-    short_description?: string | null
-    description?: string | null
-    regular_price: number         // cents
-    sale_price?: number | null
-    stock_quantity?: number
-    stock_status?: "instock" | "outofstock"
-    status?: "published" | "draft" | "archived"
-    featured_image_url?: string | null
-    meta_title?: string | null
-    meta_description?: string | null
-    
+  name: string;
+  slug?: string; // auto-generate if empty
+  product_type?: 'simple' | 'variation';
+  category_id?: string | null; // kept for WooCommerce import compat
+  category_ids?: string[]; // multi-category (synced to product_category_map)
+  brand_ids?: string[]; // multi-brand (synced to product_brand_map)
+  short_description?: string | null;
+  description?: string | null;
+  regular_price: number; // cents
+  sale_price?: number | null;
+  stock_quantity?: number;
+  stock_status?: 'instock' | 'outofstock';
+  status?: 'published' | 'draft' | 'archived';
+  featured_image_url?: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
 }

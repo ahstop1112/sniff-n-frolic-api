@@ -1,32 +1,32 @@
-import { Injectable } from '@nestjs/common'
-import { DatabaseService } from '../../database/database.service'
-import { BrandsRepository } from '../brands/brands.repository'
-import { ProductImportRow } from './products.types'
-import type { UpdateProductDto } from './dto/update-product.dto'
-import type { CreateProductDto } from './dto/create-product.dto'
+import { Injectable } from '@nestjs/common';
+import { DatabaseService } from '../../database/database.service';
+import { BrandsRepository } from '../brands/brands.repository';
+import { ProductImportRow } from './products.types';
+import type { UpdateProductDto } from './dto/update-product.dto';
+import type { CreateProductDto } from './dto/create-product.dto';
 
 @Injectable()
 export class ProductsRepository {
   public constructor(
     private readonly databaseService: DatabaseService,
     private readonly brandsRepository: BrandsRepository,
-  ) { }
+  ) {}
 
   public createCategory = async (name: string) => {
     const slug = name
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .trim()
-      .replace(/\s+/g, '-')
+      .replace(/\s+/g, '-');
 
     const result = await this.databaseService.query(
       `INSERT INTO product_categories (name, slug)
        VALUES ($1, $2)
        RETURNING id, name, slug`,
       [name, slug],
-    )
-    return result.rows[0]
-  }
+    );
+    return result.rows[0];
+  };
 
   public updateCategory = async (id: string, name: string) => {
     const result = await this.databaseService.query(
@@ -34,13 +34,13 @@ export class ProductsRepository {
        WHERE id = $2
        RETURNING id, name, slug`,
       [name, id],
-    )
-    return result.rows[0] ?? null
-  }
+    );
+    return result.rows[0] ?? null;
+  };
 
   public upsertCategory = async (wooCategory: {
-    name: string
-    slug: string
+    name: string;
+    slug: string;
   }): Promise<string> => {
     const result = await this.databaseService.query(
       `
@@ -52,15 +52,15 @@ export class ProductsRepository {
       RETURNING id
       `,
       [wooCategory.name, wooCategory.slug],
-    )
-    return result.rows[0].id as string
-  }
+    );
+    return result.rows[0].id as string;
+  };
 
   public upsertCategoryWithParent = async (cat: {
-    name: string
-    slug: string
-    parentSlug: string | null
-    imageUrl: string | null
+    name: string;
+    slug: string;
+    parentSlug: string | null;
+    imageUrl: string | null;
   }): Promise<string> => {
     const result = await this.databaseService.query(
       `
@@ -79,9 +79,9 @@ export class ProductsRepository {
       RETURNING id
       `,
       [cat.name, cat.slug, cat.parentSlug, cat.imageUrl],
-    )
-    return result.rows[0].id as string
-  }
+    );
+    return result.rows[0].id as string;
+  };
 
   public upsertImportedProduct = async (row: ProductImportRow) => {
     const result = await this.databaseService.query(
@@ -159,16 +159,16 @@ export class ProductsRepository {
         row.wooCreatedAt,
         row.wooUpdatedAt,
       ],
-    )
+    );
 
-    const product = result.rows[0]
+    const product = result.rows[0];
 
     // Sync product_category_map
     if (row.categoryIds.length > 0) {
       await this.databaseService.query(
         `DELETE FROM product_category_map WHERE product_id = $1`,
         [product.id],
-      )
+      );
       for (const categoryId of row.categoryIds) {
         await this.databaseService.query(
           `
@@ -177,7 +177,7 @@ export class ProductsRepository {
           ON CONFLICT DO NOTHING
           `,
           [product.id, categoryId],
-        )
+        );
       }
     }
 
@@ -186,7 +186,7 @@ export class ProductsRepository {
       await this.databaseService.query(
         `DELETE FROM product_images WHERE product_id = $1`,
         [product.id],
-      )
+      );
       for (const img of row.images) {
         await this.databaseService.query(
           `
@@ -194,12 +194,12 @@ export class ProductsRepository {
           VALUES ($1, $2, $3, $4, $5)
           `,
           [product.id, img.url, img.altText, img.sortOrder, img.isFeatured],
-        )
+        );
       }
     }
 
-    return product
-  }
+    return product;
+  };
 
   public findAll = async ({
     page,
@@ -207,34 +207,67 @@ export class ProductsRepository {
     categorySlug,
     search,
     status = 'published',
+    brandSlug,
+    onSale,
+    sort,
   }: {
-    page: number
-    limit: number
-    categorySlug?: string
-    search?: string
-    status?: string
+    page: number;
+    limit: number;
+    categorySlug?: string;
+    search?: string;
+    status?: string;
+    brandSlug?: string;
+    onSale?: boolean;
+    sort?: 'newest' | 'price_asc' | 'price_desc' | 'name_asc';
   }) => {
-    const offset = (page - 1) * limit
-    const params: any[] = [limit, offset, status]
-    const conditions: string[] = ['p.status = $3', "p.product_type != 'variation'"]
+    const offset = (page - 1) * limit;
+    const params: any[] = [limit, offset, status];
+    const conditions: string[] = [
+      'p.status = $3',
+      "p.product_type != 'variation'",
+    ];
 
     if (categorySlug) {
-      params.push(categorySlug)
+      params.push(categorySlug);
       conditions.push(`
         EXISTS (
           SELECT 1 FROM product_category_map pcm
           JOIN product_categories pc ON pc.id = pcm.category_id
           WHERE pcm.product_id = p.id AND pc.slug = $${params.length}
         )
-      `)
+      `);
+    }
+
+    if (brandSlug) {
+      params.push(brandSlug);
+      conditions.push(`
+        EXISTS (
+          SELECT 1 FROM product_brand_map pbm
+          JOIN brands b ON b.id = pbm.brand_id
+          WHERE pbm.product_id = p.id AND b.slug = $${params.length}
+        )
+      `);
+    }
+
+    if (onSale) {
+      conditions.push('p.sale_price IS NOT NULL');
     }
 
     if (search) {
-      params.push(`%${search}%`)
-      conditions.push(`p.name ILIKE $${params.length}`)
+      params.push(`%${search}%`);
+      conditions.push(`p.name ILIKE $${params.length}`);
     }
 
-    const where = `WHERE ${conditions.join(' AND ')}`
+    const orderBy =
+      sort === 'price_asc'
+        ? 'p.effective_price ASC'
+        : sort === 'price_desc'
+          ? 'p.effective_price DESC'
+          : sort === 'name_asc'
+            ? 'p.name ASC'
+            : 'p.created_at DESC';
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
 
     const result = await this.databaseService.query(
       `
@@ -278,16 +311,16 @@ export class ProductsRepository {
       FROM products p
       LEFT JOIN product_categories pc ON pc.id = p.category_id
       ${where}
-      ORDER BY p.created_at DESC
+      ORDER BY ${orderBy}
       LIMIT $1 OFFSET $2
       `,
       params,
-    )
+    );
 
-    return result.rows
-  }
+    return result.rows;
+  };
 
-  public findBySlug = async (slug: string) => {
+  public findBySlug = async (slug: string, manage = false) => {
     const result = await this.databaseService.query(
       `
       SELECT
@@ -369,7 +402,7 @@ export class ProductsRepository {
           FROM products v
           WHERE v.slug LIKE p.slug || '-%'
             AND v.product_type = 'variation'
-            AND v.status = 'published'
+            ${manage ? '' : "AND v.status = 'published'"}
         ) AS variations,
         (
           SELECT MIN(v.effective_price)
@@ -380,13 +413,13 @@ export class ProductsRepository {
         ) AS min_variation_price
       FROM products p
       WHERE p.slug = $1
-        AND p.status = 'published'
+        ${manage ? '' : "AND p.status = 'published'"}
       `,
       [slug],
-    )
-  
-    return result.rows[0] ?? null
-  }
+    );
+
+    return result.rows[0] ?? null;
+  };
 
   public upsertVariationAttributes = async (
     variationId: string,
@@ -395,15 +428,15 @@ export class ProductsRepository {
     await this.databaseService.query(
       `DELETE FROM product_variation_attributes WHERE variation_id = $1`,
       [variationId],
-    )
+    );
     for (const attr of attributes) {
       await this.databaseService.query(
         `INSERT INTO product_variation_attributes (variation_id, name, slug, option_value)
          VALUES ($1, $2, $3, $4)`,
         [variationId, attr.name, attr.slug, attr.optionValue],
-      )
+      );
     }
-  }
+  };
 
   public findAllCategories = async () => {
     const result = await this.databaseService.query(
@@ -424,10 +457,10 @@ export class ProductsRepository {
       GROUP BY pc.id, parent.slug
       ORDER BY pc.sort_order ASC, pc.name ASC
       `,
-    )
+    );
 
-    return result.rows
-  }
+    return result.rows;
+  };
 
   public findCategoryBySlug = async (slug: string) => {
     const result = await this.databaseService.query(
@@ -437,31 +470,31 @@ export class ProductsRepository {
       WHERE slug = $1
       `,
       [slug],
-    )
+    );
 
-    return result.rows[0] ?? null
-  }
+    return result.rows[0] ?? null;
+  };
 
   public findForManage = async ({
     page,
     limit,
     search,
   }: {
-    page: number
-    limit: number
-    search?: string
+    page: number;
+    limit: number;
+    search?: string;
   }) => {
-    const offset = (page - 1) * limit
-    const params: any[] = [limit, offset]
-    const conditions: string[] = ["p.product_type != 'variation'"]
-  
+    const offset = (page - 1) * limit;
+    const params: any[] = [limit, offset];
+    const conditions: string[] = ["p.product_type != 'variation'"];
+
     if (search) {
-      params.push(`%${search}%`)
-      conditions.push(`p.name ILIKE $${params.length}`)
+      params.push(`%${search}%`);
+      conditions.push(`p.name ILIKE $${params.length}`);
     }
-  
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const result = await this.databaseService.query(
       `
       SELECT
@@ -500,56 +533,94 @@ export class ProductsRepository {
       LIMIT $1 OFFSET $2
       `,
       params,
-    )
-  
-    return result.rows
-  }
-  
-  public updateProduct = async (id: string, dto: UpdateProductDto) => {
-    const fields: string[] = []
-    const values: any[] = []
-    let idx = 1
-  
-    if (dto.name !== undefined)               { fields.push(`name = $${idx++}`);                values.push(dto.name) }
-    if (dto.slug !== undefined)               { fields.push(`slug = $${idx++}`);                values.push(dto.slug) }
-    if (dto.short_description !== undefined)  { fields.push(`short_description = $${idx++}`);   values.push(dto.short_description) }
-    if (dto.description !== undefined)        { fields.push(`description = $${idx++}`);         values.push(dto.description) }
-    if (dto.regular_price !== undefined)      { fields.push(`regular_price = $${idx++}`);       values.push(dto.regular_price) }
-    if (dto.sale_price !== undefined)         { fields.push(`sale_price = $${idx++}`);          values.push(dto.sale_price) }
-    if (dto.stock_quantity !== undefined)     { fields.push(`stock_quantity = $${idx++}`);      values.push(dto.stock_quantity) }
-    if (dto.stock_status !== undefined)       { fields.push(`stock_status = $${idx++}`);        values.push(dto.stock_status) }
-    if (dto.status !== undefined)             { fields.push(`status = $${idx++}`);              values.push(dto.status) }
-    if (dto.featured_image_url !== undefined) { fields.push(`featured_image_url = $${idx++}`); values.push(dto.featured_image_url) }
-    if (dto.meta_title !== undefined)         { fields.push(`meta_title = $${idx++}`);          values.push(dto.meta_title) }
-    if (dto.meta_description !== undefined)   { fields.push(`meta_description = $${idx++}`);   values.push(dto.meta_description) }
-    if (dto.brand_ids !== undefined) {
-      await this.brandsRepository.syncBrandMap(id, dto.brand_ids)
-    }
-    if (fields.length === 0) return null
+    );
 
-    fields.push(`updated_at = NOW()`)
-    values.push(id)
+    return result.rows;
+  };
+
+  public updateProduct = async (id: string, dto: UpdateProductDto) => {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (dto.name !== undefined) {
+      fields.push(`name = $${idx++}`);
+      values.push(dto.name);
+    }
+    if (dto.slug !== undefined) {
+      fields.push(`slug = $${idx++}`);
+      values.push(dto.slug);
+    }
+    if (dto.short_description !== undefined) {
+      fields.push(`short_description = $${idx++}`);
+      values.push(dto.short_description);
+    }
+    if (dto.description !== undefined) {
+      fields.push(`description = $${idx++}`);
+      values.push(dto.description);
+    }
+    if (dto.regular_price !== undefined) {
+      fields.push(`regular_price = $${idx++}`);
+      values.push(dto.regular_price);
+    }
+    if (dto.sale_price !== undefined) {
+      fields.push(`sale_price = $${idx++}`);
+      values.push(dto.sale_price);
+    }
+    if (dto.stock_quantity !== undefined) {
+      fields.push(`stock_quantity = $${idx++}`);
+      values.push(dto.stock_quantity);
+    }
+    if (dto.stock_status !== undefined) {
+      fields.push(`stock_status = $${idx++}`);
+      values.push(dto.stock_status);
+    }
+    if (dto.status !== undefined) {
+      fields.push(`status = $${idx++}`);
+      values.push(dto.status);
+    }
+    if (dto.featured_image_url !== undefined) {
+      fields.push(`featured_image_url = $${idx++}`);
+      values.push(dto.featured_image_url);
+    }
+    if (dto.meta_title !== undefined) {
+      fields.push(`meta_title = $${idx++}`);
+      values.push(dto.meta_title);
+    }
+    if (dto.meta_description !== undefined) {
+      fields.push(`meta_description = $${idx++}`);
+      values.push(dto.meta_description);
+    }
+    if (dto.brand_ids !== undefined) {
+      await this.brandsRepository.syncBrandMap(id, dto.brand_ids);
+    }
+    if (fields.length === 0) return null;
+
+    fields.push(`updated_at = NOW()`);
+    values.push(id);
 
     const result = await this.databaseService.query(
       `UPDATE products SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
       values,
-    )
+    );
 
     if (dto.category_ids !== undefined) {
-      await this.syncCategoryMap(id, dto.category_ids)
+      await this.syncCategoryMap(id, dto.category_ids);
     }
 
-    return result.rows[0] ?? null
-  }
-  
+    return result.rows[0] ?? null;
+  };
+
   public createProduct = async (dto: CreateProductDto) => {
     // Auto-generate slug from name if not provided
-    const slug = dto.slug?.trim() || dto.name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-  
+    const slug =
+      dto.slug?.trim() ||
+      dto.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-');
+
     const result = await this.databaseService.query(
       `
       INSERT INTO products (
@@ -558,7 +629,7 @@ export class ProductsRepository {
         status, featured_image_url, meta_title, meta_description,
         product_type, currency, manage_stock
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'simple','CAD',false)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'CAD',false)
       RETURNING *
       `,
       [
@@ -574,58 +645,67 @@ export class ProductsRepository {
         dto.featured_image_url ?? null,
         dto.meta_title ?? null,
         dto.meta_description ?? null,
-      ]
-    )
+        dto.product_type ?? 'simple',
+      ],
+    );
 
-    const product = result.rows[0]
+    const product = result.rows[0];
 
     if (dto.category_ids && dto.category_ids.length > 0) {
-      await this.syncCategoryMap(product.id, dto.category_ids)
+      await this.syncCategoryMap(product.id, dto.category_ids);
     }
 
     if (dto.brand_ids && dto.brand_ids.length > 0) {
-      await this.brandsRepository.syncBrandMap(product.id, dto.brand_ids)
+      await this.brandsRepository.syncBrandMap(product.id, dto.brand_ids);
     }
 
-    return product
-  }
+    return product;
+  };
 
-  private syncCategoryMap = async (productId: string, categoryIds: string[]): Promise<void> => {
+  private syncCategoryMap = async (
+    productId: string,
+    categoryIds: string[],
+  ): Promise<void> => {
     await this.databaseService.query(
       `DELETE FROM product_category_map WHERE product_id = $1`,
       [productId],
-    )
+    );
     for (const categoryId of categoryIds) {
       await this.databaseService.query(
         `INSERT INTO product_category_map (product_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
         [productId, categoryId],
-      )
+      );
     }
-  }
+  };
 
   public deleteProduct = async (id: string): Promise<boolean> => {
     const result = await this.databaseService.query(
       `UPDATE products SET status = 'archived', updated_at = NOW() WHERE id = $1 RETURNING id`,
       [id],
-    )
-    return (result.rowCount ?? 0) > 0
-  }
+    );
+    return (result.rowCount ?? 0) > 0;
+  };
 
   public updateProductImages = async (
     productId: string,
-    images: { url: string; alt_text: string | null; sort_order: number; is_featured: boolean }[]
+    images: {
+      url: string;
+      alt_text: string | null;
+      sort_order: number;
+      is_featured: boolean;
+    }[],
   ) => {
     await this.databaseService.query(
       `DELETE FROM product_images WHERE product_id = $1`,
-      [productId]
-    )
+      [productId],
+    );
 
     for (const img of images) {
       await this.databaseService.query(
         `INSERT INTO product_images (product_id, url, alt_text, sort_order, is_featured)
         VALUES ($1, $2, $3, $4, $5)`,
-        [productId, img.url, img.alt_text, img.sort_order, img.is_featured]
-      )
+        [productId, img.url, img.alt_text, img.sort_order, img.is_featured],
+      );
     }
-  }
-} 
+  };
+}

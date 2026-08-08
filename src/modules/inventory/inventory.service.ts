@@ -58,25 +58,32 @@ export class InventoryService {
     const search = query.search?.trim() || null
     const lowStockOnly = query.low_stock_only === true
 
-    const where: string[] = [`p.product_type IN ('simple', 'variation')`]
-    const params: unknown[] = []
+    // whereParams: only what the WHERE clause references. Count query uses these.
+    const whereClauses: string[] = [`p.product_type IN ('simple', 'variation')`]
+    const whereParams: unknown[] = []
 
     if (search) {
-      params.push(`%${search}%`)
-      const idx = params.length
-      where.push(`(p.name ILIKE $${idx} OR p.sku ILIKE $${idx})`)
+      whereParams.push(`%${search}%`)
+      const idx = whereParams.length
+      whereClauses.push(`(p.name ILIKE $${idx} OR p.sku ILIKE $${idx})`)
     }
-
-    // Low-stock predicate reused for filter + is_low_stock projection.
-    params.push(threshold)
-    const thresholdIdx = params.length
-    const lowStockExpr = `(p.manage_stock AND p.stock_quantity > 0 AND p.stock_quantity <= $${thresholdIdx})`
 
     if (lowStockOnly) {
-      where.push(lowStockExpr)
+      whereParams.push(threshold)
+      const idx = whereParams.length
+      whereClauses.push(
+        `(p.manage_stock AND p.stock_quantity > 0 AND p.stock_quantity <= $${idx})`,
+      )
     }
 
-    const whereSql = where.join(' AND ')
+    const whereSql = whereClauses.join(' AND ')
+
+    // List query needs threshold for is_low_stock projection too.
+    // Simplest: always append it for the list, referenced at its own index.
+    const projThresholdIdx = whereParams.length + 1
+    const limitIdx = whereParams.length + 2
+    const offsetIdx = whereParams.length + 3
+    const listParams: unknown[] = [...whereParams, threshold, limit, offset]
 
     const listSql = `
       SELECT
@@ -87,16 +94,15 @@ export class InventoryService {
         p.stock_quantity,
         p.manage_stock,
         p.stock_status,
-        ${lowStockExpr} AS is_low_stock,
+        (p.manage_stock AND p.stock_quantity > 0 AND p.stock_quantity <= $${projThresholdIdx}) AS is_low_stock,
         p.parent_id,
         parent.name AS parent_name
       FROM products p
       LEFT JOIN products parent ON parent.id = p.parent_id
       WHERE ${whereSql}
       ORDER BY COALESCE(parent.name, p.name), p.name
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `
-    const listParams = [...params, limit, offset]
 
     const countSql = `
       SELECT COUNT(*)::int AS total
@@ -106,7 +112,7 @@ export class InventoryService {
 
     const [listResult, countResult] = await Promise.all([
       this.db.query<StockRow>(listSql, listParams),
-      this.db.query<{ total: number }>(countSql, params),
+      this.db.query<{ total: number }>(countSql, whereParams),
     ])
 
     return {

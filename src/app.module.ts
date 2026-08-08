@@ -8,9 +8,10 @@ import { OrdersModule } from './modules/orders/orders.module'
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module'
 import { ProductsController } from './modules/products/products.controller'
 import { AiModule } from './modules/ai/ai.module'
+import { InventoryModule } from './modules/inventory/inventory.module'
 
 @Module({
-  imports: [DatabaseModule, FeatureFlagsModule, AuthModule, ProductsModule, OrdersModule, AiModule,],
+  imports: [DatabaseModule, FeatureFlagsModule, AuthModule, ProductsModule, OrdersModule, AiModule, InventoryModule,],
   controllers: [AppController, ProductsController],
   providers: [AppService],
 })
